@@ -1,67 +1,67 @@
+slimes = {}
 minetest.register_entity("slimes:slime", {
 	initial_properties = {
-		physical = false,
-		collide_with_objects = false,
+		physical = true,
+		collide_with_objects = true,
 		collisionbox = {-0.5,-0.5,-0.5, 0.5,0.5,0.5}, 
 		visual = "mesh",
 		mesh = "slime.x",
 		--visual_size = {3,3},slime_inside
 		textures = {"slime_outside.png","slime_inside.png","eye_right.png","eye_left.png","mouth.png"},
-		automatic_face_movement_dir = 0.0,
 	},
+	
+	timer = 0, --timer for state
+	state = 0, --0 stand, 1 jump around, 2 attack
+	state_change = 0, --when to change state
+	
 	on_activate = function(self)
 		self.object:set_animation({x=10,y=50},7, 0)
 		--self.object:set_animation({x=70,y=95},40, 0)
+		self.object:setacceleration({x=0,y=-10,z=0})
+	end,
+	on_step = function(self,dtime)
+		slimes.state_change(self,dtime)
+		slimes.movement(self)
 	end,
 })
 
+slimes.state_change = function(self,dtime)
+	self.timer = self.timer + dtime
+	local vel = self.object:getvelocity()
+	
+	if self.timer > self.state_change then
+		self.state = math.random(0,1)
+		self.state_change = math.random(3,9)
+		self.timer = 0
+		if self.state == 0 then
+			self.object:setvelocity({x=0,y=vel.y,z=0})
+		elseif self.state == 1 then
+			self.object:setyaw((math.random(0, 360) - 180) / 180 * math.pi)
+		end
+	end
+end
 
-mobs:register_mob("slimes:grass_slime",{
-	type = "animal",
-	passive = "true",
-	visual  = "mesh",
-	mesh    = "slime.x",
-	textures = {{"slime_outside.png","slime_inside.png","eye_right.png","eye_left.png","mouth.png"},},
-	collisionbox = {-0.5,-0.5,-0.5, 0.5,0.5,0.5}, 
+slimes.movement = function(self)
+	local pos = self.object:getpos()
+	local vel = self.object:getvelocity()
 	
-	makes_footstep_sound = false,
-	sounds = green_sounds,
-	attack_type = "dogfight",
-	attacks_monsters = true,
-	damage = 1,
-	walk_velocity = 2,
-	run_velocity = 3,
-	walk_chance = 0,
-	jump_chance = 30,
-	jump_height = 3,
-	armor = 100,
-	view_range = 10,
-	drops = {
-		{name = "mesecons_materials:glue", chance = 4, min = 1, max = 2},
-	},
-	drawtype = "front",
-	water_damage = 0,
-	lava_damage = 10,
-	light_damage = 0,
-	animation = {
-		speed_normal = 10,
-		speed_run    = 15,
-		stand_start  = 10,
-		stand_end    = 50,
-		walk_start   = 80,
-		walk_end     = 95,
 	
-	}
+	if self.state == 1 and vel.y == 0 then
+		if minetest.registered_items[minetest.get_node({x=pos.x,y=pos.y-1,z=pos.z}).name].walkable then
+			local yaw = self.object:getyaw()
+			local dir_x = -math.sin(yaw) * 2
+			local dir_z = math.cos(yaw) * 2
+			self.object:setvelocity({x=dir_x,y=6,z=dir_z})
+			
+			self.object:set_animation({x=70,y=95},60, 0, false)
+			minetest.after(1,function(self)
+				self.object:set_animation({x=10,y=50},7, 0)
+			end,self)
+		end
+	end
+end
+minetest.override_item("default:stick", {
+    on_place = function(itemstack, placer, pointed_thing)
+		minetest.add_entity(pointed_thing.above,"slimes:slime")
+    end,
 })
-
-
-
-
-
- mobs:spawn({name = "slimes:grass_slime",
-       nodes = {"default:dirt_with_grass"},
-       max_light = 13,
-       min_light = 0,
-       interval = 5,
-       chance = 1,
-    })
